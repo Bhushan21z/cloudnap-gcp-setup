@@ -1,0 +1,12 @@
+title: "CloudNap Instance Operator"
+description: "Least-privilege role for CloudNap SaaS to list/start/stop VMs. Explicitly does NOT include delete, setMetadata, or setServiceAccount permissions. DNS permissions are added separately when the operator opts in to DNS management."
+stage: "GA"
+includedPermissions:
+  # --- Compute: read + start/stop only ---
+  - compute.instances.list
+  - compute.instances.get
+  - compute.instances.start
+  - compute.instances.stop
+  - compute.zones.list
+  - compute.zoneOperations.get
+  - compute.zoneOperations.list

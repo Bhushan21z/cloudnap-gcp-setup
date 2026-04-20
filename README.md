@@ -4,7 +4,8 @@ Public setup artifacts for connecting a GCP project to [CloudNap](https://cloudn
 
 ## Files
 
-- [`cloudnap-role.yaml`](./cloudnap-role.yaml) — IAM custom role definition (least-privilege)
+- [`cloudnap-role.yaml`](./cloudnap-role.yaml) — compute-only custom role (default)
+- [`cloudnap-role-dns.yaml`](./cloudnap-role-dns.yaml) — compute + DNS custom role (opt-in)
 - [`setup.sh`](./setup.sh) — idempotent connector setup script
 - [`TUTORIAL.md`](./TUTORIAL.md) — Cloud Shell tutorial
 
@@ -19,16 +20,22 @@ https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https://git
 Then in Cloud Shell:
 
 ```bash
+# Compute-only (default)
 bash setup.sh
+
+# Or with DNS record-set management
+ENABLE_DNS=yes bash setup.sh
+# equivalent:
+bash setup.sh --enable-dns
 ```
 
-The script prints the two values (service account email + project ID) to paste back into CloudNap.
+The script prints the values (service account email + project ID + DNS flag) to paste back into CloudNap.
 
 ## What permissions does CloudNap get?
 
-See [`cloudnap-role.yaml`](./cloudnap-role.yaml). Highlights:
+See [`cloudnap-role.yaml`](./cloudnap-role.yaml) (base) and [`cloudnap-role-dns.yaml`](./cloudnap-role-dns.yaml) (with DNS). Highlights:
 
-- Can: list VMs, start/stop VMs, manage DNS record sets
+- Can: list VMs, start/stop VMs *(plus manage DNS record sets when DNS is enabled)*
 - **Cannot**: delete VMs, modify VM metadata/SSH keys, change attached service accounts, create/delete disks, create/delete DNS zones
 
 ## Disconnect
