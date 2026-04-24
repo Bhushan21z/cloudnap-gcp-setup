@@ -1,0 +1,52 @@
+title: "CloudNap Instance Operator + Billing"
+description: "Least-privilege role for CloudNap SaaS: list/start/stop VMs + read-only recommender, monitoring, and asset inventory for the Billing Dashboard. No delete, setMetadata, setServiceAccount, or any write access to recommendations."
+stage: "GA"
+includedPermissions:
+  # --- Compute: read + start/stop only ---
+  - compute.instances.list
+  - compute.instances.get
+  - compute.instances.start
+  - compute.instances.stop
+  - compute.zones.list
+  - compute.zoneOperations.get
+  - compute.zoneOperations.list
+  - compute.disks.list
+  - compute.disks.get
+  - compute.addresses.list
+  - compute.machineTypes.list
+
+  # --- Project / Resource Manager (read-only) ---
+  # NOTE: billing.accounts.* permissions are not valid at project scope;
+  # grant roles/billing.viewer on the billing account separately if needed.
+  - resourcemanager.projects.get
+  - resourcemanager.projects.getIamPolicy
+
+  # --- Recommender (Compute recommendations — read + list, never apply) ---
+  # NOTE: *UtilizationInsights* and Cloud SQL recommender permissions are
+  # rejected at project-role scope. Grant roles/recommender.computeViewer
+  # separately if you need commitment/insights data.
+  - recommender.computeInstanceIdleResourceRecommendations.list
+  - recommender.computeInstanceIdleResourceRecommendations.get
+  - recommender.computeInstanceMachineTypeRecommendations.list
+  - recommender.computeInstanceMachineTypeRecommendations.get
+  - recommender.computeDiskIdleResourceRecommendations.list
+  - recommender.computeDiskIdleResourceRecommendations.get
+  - recommender.computeAddressIdleResourceRecommendations.list
+  - recommender.computeAddressIdleResourceRecommendations.get
+  - recommender.computeImageIdleResourceRecommendations.list
+
+  # --- Cloud Monitoring: read utilization time-series ---
+  - monitoring.timeSeries.list
+  - monitoring.metricDescriptors.list
+  - monitoring.metricDescriptors.get
+
+  # --- Cloud Asset Inventory: resource inventory ---
+  - cloudasset.assets.searchAllResources
+  - cloudasset.assets.listResource
+
+  # --- Logging (optional — useful for correlating spikes with activity) ---
+  - logging.logs.list
+
+  # --- Service Usage: detect which APIs are enabled ---
+  - serviceusage.services.list
+  - serviceusage.services.get
