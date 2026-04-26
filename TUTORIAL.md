@@ -6,13 +6,13 @@ This tutorial creates a **least-privilege** connection between your GCP project 
 
 Running `setup.sh` will:
 
-1. **Enable APIs**: Compute Engine + IAM Credentials (plus Cloud DNS / Billing only if you opt in)
+1. **Enable APIs**: Compute Engine + IAM Credentials (plus Cloud DNS / Recommender / Monitoring / Asset / Billing only if you opt in)
 2. **Create a custom IAM role** called `CloudNap Instance Operator` containing only:
    - Compute: `instances.list`, `instances.get`, `instances.start`, `instances.stop`, `zones.list`, `zoneOperations.get/list`
-   - DNS *(only when `ENABLE_DNS=yes`)*: `managedZones.list/get`, `resourceRecordSets.list/get/create/update/delete`, `changes.create/get`
-   - Billing *(only when `ENABLE_BILLING=yes`)*: read-only Recommender, Cloud Monitoring, Cloud Asset Inventory. No write access.
+   - DNS *(only when DNS is enabled)*: `managedZones.list/get`, `resourceRecordSets.list/get/create/update/delete`, `changes.create/get`
+   - Billing *(only when Billing is enabled)*: read-only Recommender, Monitoring, Asset Inventory, Cloud Billing
    - **CloudNap cannot delete VMs, modify metadata, or change service accounts.**
-3. **Create a dedicated service account** `cloudnap-connector-<TOKEN>@<PROJECT>.iam.gserviceaccount.com`
+3. **Create a dedicated service account** `cloudnap-connector-<token>@<PROJECT>.iam.gserviceaccount.com` — the `<token>` is a per-account secret CloudNap generated for you (this is GCP's equivalent of AWS's external ID)
 4. **Bind the custom role** to that service account
 5. **Grant CloudNap's SA permission** to impersonate your service account (Service Account Token Creator)
 
@@ -20,51 +20,27 @@ No service account keys are created. No long-lived credentials leave your projec
 
 ## Run the setup
 
-**Copy the exact command from your CloudNap GCP setup screen** — it has your token pre-filled:
+CloudNap shows you a single command to copy and paste — it already has your unique token and your DNS / Billing choices baked in. It looks like:
 
 ```bash
 CLOUDNAP_TOKEN=<your-token> ENABLE_DNS=yes ENABLE_BILLING=yes bash setup.sh
 ```
 
-`CLOUDNAP_TOKEN` is required. It uniquely identifies your CloudNap organisation and is used to name
-the service account, so CloudNap can look it up on the other end.
+Just paste that in Cloud Shell and press Enter.
 
-**Compute-only (no DNS, no Billing):**
-
-```bash
-CLOUDNAP_TOKEN=<your-token> bash setup.sh
-```
-
-**Compute + DNS + Billing (recommended):**
-
-```bash
-CLOUDNAP_TOKEN=<your-token> ENABLE_DNS=yes ENABLE_BILLING=yes bash setup.sh
-```
-
-<walkthrough-editor-open-file filePath="setup.sh">Open setup.sh</walkthrough-editor-open-file> to review it first if you'd like.
+> The `CLOUDNAP_TOKEN` is required. It binds this setup to a specific account inside CloudNap, so a leaked project ID alone is not enough for anyone else to register your project.
 
 ## Paste the result into CloudNap
 
-When the script finishes, it prints:
+When the script finishes, go back to CloudNap and enter:
 
-- **Service account email** (like `cloudnap-connector-<token>@my-project.iam.gserviceaccount.com`)
-- **Project ID**
+- **Project ID** (the project you ran the script in)
 
-Copy both values into the CloudNap setup screen and click **Connect GCP Account**.
+That's it. CloudNap already knows your token and computes the service account email automatically.
 
 ## Changing your mind later
 
-Safe to re-run with the same `CLOUDNAP_TOKEN`. Passing or dropping `ENABLE_DNS` / `ENABLE_BILLING`
-will swap the role definition in place — your SA keeps the same email so no reconnection is needed
-on the CloudNap side, just re-verify the account.
-
-```bash
-# Turn DNS on later
-CLOUDNAP_TOKEN=<your-token> ENABLE_DNS=yes ENABLE_BILLING=yes bash setup.sh
-
-# Turn Billing off
-CLOUDNAP_TOKEN=<your-token> ENABLE_BILLING=no bash setup.sh
-```
+Safe to re-run with the same token. Toggling `ENABLE_DNS` or `ENABLE_BILLING` will swap the role definition in place — your SA keeps the same email so no reconnection is needed on the CloudNap side, just re-verify the account.
 
 ## Disconnecting later
 
@@ -77,8 +53,7 @@ You can override defaults before running:
 ```bash
 export PROJECT_ID="my-other-project"         # Target a different project
 export ROLE_ID="customRoleName"              # Change role ID
-export CLOUDNAP_TOKEN="mytoken"             # Your CloudNap org token
 export ENABLE_DNS=yes                        # Opt in to DNS management
-export ENABLE_BILLING=yes                    # Opt in to Billing dashboard
-bash setup.sh
+export ENABLE_BILLING=yes                    # Opt in to billing dashboard
+CLOUDNAP_TOKEN=<your-token> bash setup.sh
 ```

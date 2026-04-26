@@ -1,57 +1,50 @@
 #!/usr/bin/env bash
 # CloudNap GCP connector setup
 # ---------------------------------------------------------------
-# Usage (copy the exact command from your CloudNap setup screen):
-#
-#   CLOUDNAP_TOKEN=<token> ENABLE_DNS=yes ENABLE_BILLING=yes bash setup.sh
-#
-# CLOUDNAP_TOKEN is required — it uniquely identifies your CloudNap org
-# and is used to name the service account:
-#   cloudnap-connector-<token>@<project>.iam.gserviceaccount.com
-#
 # This script:
-#   1. Enables the Compute Engine API (+ Cloud DNS / Billing if opted in)
+#   1. Enables the Compute Engine API (+ Cloud DNS if DNS is opted in)
 #   2. Creates a least-privilege custom IAM role (CloudNap Instance Operator)
 #         - Compute-only by default (list / get / start / stop)
-#         - DNS permissions added ONLY when ENABLE_DNS=yes
-#         - Billing permissions added ONLY when ENABLE_BILLING=yes
-#   3. Creates a dedicated service account cloudnap-connector-<token>
+#         - DNS permissions added ONLY when ENABLE_DNS=yes / --enable-dns
+#   3. Creates a dedicated service account (cloudnap-connector)
 #   4. Binds the custom role to that SA
 #   5. Grants CloudNap's SA permission to impersonate it
 #
 # At the end it prints the values you paste back into CloudNap:
 #   - Service account email
 #   - Project ID
+#   - DNS enabled (yes/no)
 #
-# Safe to re-run — every step is idempotent. Re-running with different
-# ENABLE_DNS / ENABLE_BILLING values will swap the role definition in place.
+# Safe to re-run — every step is idempotent. Re-running with a different
+# ENABLE_DNS value will swap the role definition in place.
 # ---------------------------------------------------------------
 
 set -euo pipefail
 
-# ---- CLOUDNAP_TOKEN: required, uniquely identifies your org ----
-# Accept either env var or --token= CLI flag.
-CLOUDNAP_TOKEN="${CLOUDNAP_TOKEN:-}"
-for arg in "$@"; do
-    case "$arg" in
-        --token=*) CLOUDNAP_TOKEN="${arg#--token=}" ;;
-    esac
-done
-
-if [[ -z "$CLOUDNAP_TOKEN" ]]; then
-    echo ""
-    echo "ERROR: CLOUDNAP_TOKEN is required." >&2
-    echo "       Copy the full command from your CloudNap GCP setup screen." >&2
-    echo "       It looks like:" >&2
-    echo "         CLOUDNAP_TOKEN=<token> ENABLE_DNS=yes ENABLE_BILLING=yes bash setup.sh" >&2
-    echo ""
-    exit 1
-fi
-
 # ---- Configurable: override via env vars if you like ----
 CLOUDNAP_SA="${CLOUDNAP_SA:-cloudnap-admin@gen-lang-client-0395474001.iam.gserviceaccount.com}"
 ROLE_ID="${ROLE_ID:-cloudNapInstanceOperator}"
-# Service account name includes your org token so CloudNap can identify it.
+
+# ---- Per-account connector token (REQUIRED) ----
+# CloudNap generates a unique token per cloud account and bakes it into the
+# service-account local-part:
+#     cloudnap-connector-<token>@<projectId>.iam.gserviceaccount.com
+# This is the GCP-equivalent of AWS's externalId — it stops a third party
+# who only knows your project ID from being able to register your project
+# under their own CloudNap org.
+#
+# Pass it as CLOUDNAP_TOKEN=<token> when invoking this script. The token
+# must be 11 lowercase alphanumeric characters, starting with a letter.
+if [[ -z "${CLOUDNAP_TOKEN:-}" ]]; then
+    echo "ERROR: CLOUDNAP_TOKEN is required." >&2
+    echo "Copy the token shown in the CloudNap UI and re-run as:" >&2
+    echo "    CLOUDNAP_TOKEN=<token> bash setup.sh" >&2
+    exit 1
+fi
+if [[ ! "$CLOUDNAP_TOKEN" =~ ^[a-z][a-z0-9]{10}$ ]]; then
+    echo "ERROR: CLOUDNAP_TOKEN must be 11 lowercase alphanumerics, starting with a letter." >&2
+    exit 1
+fi
 CLIENT_SA_NAME="${CLIENT_SA_NAME:-cloudnap-connector-${CLOUDNAP_TOKEN}}"
 
 # ---- DNS + Billing flags: off/on by default, user can toggle ----
@@ -99,12 +92,12 @@ gcloud config set project "$PROJECT_ID" >/dev/null
 if [[ "$DNS_ENABLED" -eq 1 ]]; then
     DNS_LABEL="yes (Cloud DNS API + record-set permissions)"
 else
-    DNS_LABEL="no (compute-only; re-run with ENABLE_DNS=yes to turn on)"
+    DNS_LABEL="no (compute-only; re-run with --enable-dns to turn on)"
 fi
 if [[ "$BILLING_ENABLED" -eq 1 ]]; then
     BILLING_LABEL="yes (Recommender + Monitoring + Asset + Billing APIs, read-only)"
 else
-    BILLING_LABEL="no (re-run with ENABLE_BILLING=yes to turn on)"
+    BILLING_LABEL="no (re-run with --enable-billing to turn on)"
 fi
 
 echo ""
@@ -124,13 +117,12 @@ echo ""
 APIS=(compute.googleapis.com iamcredentials.googleapis.com)
 [[ "$DNS_ENABLED" -eq 1 ]] && APIS+=(dns.googleapis.com)
 if [[ "$BILLING_ENABLED" -eq 1 ]]; then
-    # Recommender, Monitoring, Asset Inventory, Cloud Billing, BigQuery, Resource Manager
+    # Recommender, Monitoring, Asset Inventory, Cloud Billing, Resource Manager
     APIS+=(
         recommender.googleapis.com
         monitoring.googleapis.com
         cloudasset.googleapis.com
         cloudbilling.googleapis.com
-        bigquery.googleapis.com
         cloudresourcemanager.googleapis.com
         serviceusage.googleapis.com
     )
@@ -158,7 +150,7 @@ retry() {
 }
 
 # ---- 2. Pick the right role YAML (DNS + billing combinations) ----
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(dirname "$0")"
 if [[ "$DNS_ENABLED" -eq 1 && "$BILLING_ENABLED" -eq 1 ]]; then
     ROLE_BASENAME="cloudnap-role-dns-billing.yaml"
 elif [[ "$DNS_ENABLED" -eq 1 ]]; then
@@ -169,11 +161,10 @@ else
     ROLE_BASENAME="cloudnap-role.yaml"
 fi
 ROLE_YAML="$SCRIPT_DIR/$ROLE_BASENAME"
-# Fallback URL — path includes cloudnap-gcp/ subdir matching the repo workspace
-REMOTE_ROLE_YAML="https://raw.githubusercontent.com/Bhushan21z/cloudnap-gcp-setup/main/cloudnap-gcp/$ROLE_BASENAME"
+REMOTE_ROLE_YAML="https://raw.githubusercontent.com/Bhushan21z/cloudnap-gcp-setup/main/$ROLE_BASENAME"
 
 if [[ ! -f "$ROLE_YAML" ]]; then
-    echo "[2/5] Downloading role definition from GitHub..."
+    echo "[2/5] Downloading role definition..."
     ROLE_YAML="/tmp/$(basename "$ROLE_YAML")"
     curl -fsSL "$REMOTE_ROLE_YAML" -o "$ROLE_YAML"
 fi
@@ -228,37 +219,29 @@ retry 6 5 "Impersonation binding" \
 # ---- Done. Print what the user needs to paste. ----
 echo ""
 echo "==================================================="
-echo "  Setup complete! Paste these into CloudNap:"
+echo "  Setup complete! Paste this into CloudNap:"
 echo "==================================================="
-echo ""
-echo "  Service account email:"
-echo "    ${CLIENT_SA}"
 echo ""
 echo "  Project ID:"
 echo "    ${PROJECT_ID}"
+echo ""
+echo "  (CloudNap already knows your connector token — it"
+echo "   computes the service account email automatically.)"
+echo ""
+echo "  For reference, the SA created was:"
+echo "    ${CLIENT_SA}"
 echo ""
 if [[ "$DNS_ENABLED" -eq 1 ]]; then
     echo "  DNS management:  enabled"
 else
     echo "  DNS management:  disabled"
-    echo "     (re-run with  CLOUDNAP_TOKEN=${CLOUDNAP_TOKEN} ENABLE_DNS=yes bash setup.sh  to turn it on)"
+    echo "     (re-run with  ENABLE_DNS=yes bash setup.sh  to turn it on)"
 fi
 if [[ "$BILLING_ENABLED" -eq 1 ]]; then
     echo "  Billing dashboard: enabled"
-    echo ""
-    echo "  *** BigQuery billing export (one extra step) ***"
-    echo "  The Billing Dashboard reads your GCP billing export from BigQuery."
-    echo "  Grant the service account read access to that dataset:"
-    echo ""
-    echo "    bq add-iam-policy-binding \\"
-    echo "      --member=\"serviceAccount:${CLIENT_SA}\" \\"
-    echo "      --role=\"roles/bigquery.dataViewer\" \\"
-    echo "      <your-billing-export-dataset>"
-    echo ""
-    echo "  Then enter the dataset + table name in CloudNap's Billing settings."
 else
     echo "  Billing dashboard: disabled"
-    echo "     (re-run with  CLOUDNAP_TOKEN=${CLOUDNAP_TOKEN} ENABLE_BILLING=yes bash setup.sh  to turn it on)"
+    echo "     (re-run with  ENABLE_BILLING=yes bash setup.sh  to turn it on)"
 fi
 echo ""
 echo "==================================================="

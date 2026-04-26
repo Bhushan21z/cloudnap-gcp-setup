@@ -1,5 +1,5 @@
-title: "CloudNap Instance Operator + DNS"
-description: "Least-privilege role for CloudNap SaaS to list/start/stop VMs and manage DNS record sets. Explicitly does NOT include delete, setMetadata, setServiceAccount, or create/delete DNS zones."
+title: "CloudNap Instance Operator"
+description: "Least-privilege role for CloudNap SaaS to list/start/stop VMs and manage DNS record sets. Explicitly does NOT include delete, setMetadata, or setServiceAccount permissions."
 stage: "GA"
 includedPermissions:
   # --- Compute: read + start/stop only ---
@@ -10,11 +10,6 @@ includedPermissions:
   - compute.zones.list
   - compute.zoneOperations.get
   - compute.zoneOperations.list
-  # Read-only enrichment (disk size, external IPs, machine type) shown in the VM list UI
-  - compute.disks.list
-  - compute.disks.get
-  - compute.addresses.list
-  - compute.machineTypes.list
   # --- DNS: manage record sets in existing zones (cannot create/delete zones) ---
   - dns.managedZones.list
   - dns.managedZones.get
