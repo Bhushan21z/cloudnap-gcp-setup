@@ -1,5 +1,5 @@
 title: "CloudNap Instance Operator + Billing"
-description: "Least-privilege role for CloudNap SaaS: list/start/stop VMs + read-only recommender, monitoring, and asset inventory for the Billing Dashboard. No delete, setMetadata, setServiceAccount, or any write access to recommendations."
+description: "Least-privilege role for CloudNap SaaS: list/start/stop VMs + read-only recommender, monitoring, asset inventory, and BigQuery jobs for the Billing Dashboard. No delete, setMetadata, setServiceAccount, or any write access to recommendations."
 stage: "GA"
 includedPermissions:
   # --- Compute: read + start/stop only ---
@@ -10,16 +10,14 @@ includedPermissions:
   - compute.zones.list
   - compute.zoneOperations.get
   - compute.zoneOperations.list
+  # Read-only enrichment (disk size, external IPs, machine type) shown in the VM list UI
   - compute.disks.list
   - compute.disks.get
   - compute.addresses.list
   - compute.machineTypes.list
 
-  # --- Project / Resource Manager (read-only) ---
-  # NOTE: billing.accounts.* permissions are not valid at project scope;
-  # grant roles/billing.viewer on the billing account separately if needed.
+  # --- Project / Resource Manager (read-only project metadata only) ---
   - resourcemanager.projects.get
-  - resourcemanager.projects.getIamPolicy
 
   # --- Recommender (Compute recommendations — read + list, never apply) ---
   # NOTE: *UtilizationInsights* and Cloud SQL recommender permissions are
@@ -42,10 +40,14 @@ includedPermissions:
 
   # --- Cloud Asset Inventory: resource inventory ---
   - cloudasset.assets.searchAllResources
-  - cloudasset.assets.listResource
+  - cloudasset.assets.listAssets
 
-  # --- Logging (optional — useful for correlating spikes with activity) ---
-  - logging.logs.list
+  # --- BigQuery: run cost queries against the billing export dataset ---
+  # NOTE: also grant roles/bigquery.dataViewer on the billing export dataset
+  # to this service account — the setup script prints instructions for this.
+  - bigquery.jobs.create
+  - bigquery.tables.get
+  - bigquery.tables.list
 
   # --- Service Usage: detect which APIs are enabled ---
   - serviceusage.services.list
