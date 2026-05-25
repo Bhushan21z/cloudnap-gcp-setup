@@ -44,6 +44,20 @@ includedPermissions:
   - cloudasset.assets.searchAllResources
   - cloudasset.assets.listResource
 
+  # --- BigQuery: read the customer's billing-export table ---
+  # CloudNap runs parameterized SELECT queries against the
+  # gcp_billing_export_resource_v1_* table to power the cost dashboard.
+  # The dataset-level grant (roles/bigquery.dataViewer on the dataset)
+  # is done manually by the user from the BigQuery console; the
+  # project-level "job runner" permissions live here so the same SA
+  # can submit query jobs and read the BQ Storage stream.
+  - bigquery.jobs.create
+  - bigquery.jobs.get
+  - bigquery.jobs.list
+  - bigquery.readsessions.create
+  - bigquery.readsessions.getData
+  - bigquery.readsessions.update
+
   # --- Logging (optional — useful for correlating spikes with activity) ---
   - logging.logs.list
 

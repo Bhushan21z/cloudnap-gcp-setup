@@ -55,6 +55,18 @@ includedPermissions:
   - cloudasset.assets.searchAllResources
   - cloudasset.assets.listResource
 
+  # --- BigQuery: read the customer's billing-export table ---
+  # Project-level "job runner" permissions so the connector SA can submit
+  # SELECT queries against the gcp_billing_export_resource_v1_* table.
+  # The dataset-level grant (roles/bigquery.dataViewer on the dataset)
+  # is done manually by the user from the BigQuery console.
+  - bigquery.jobs.create
+  - bigquery.jobs.get
+  - bigquery.jobs.list
+  - bigquery.readsessions.create
+  - bigquery.readsessions.getData
+  - bigquery.readsessions.update
+
   # --- Logging (optional) ---
   - logging.logs.list
 

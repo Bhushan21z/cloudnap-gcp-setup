@@ -95,7 +95,7 @@ else
     DNS_LABEL="no (compute-only; re-run with --enable-dns to turn on)"
 fi
 if [[ "$BILLING_ENABLED" -eq 1 ]]; then
-    BILLING_LABEL="yes (Recommender + Monitoring + Asset + Billing APIs, read-only)"
+    BILLING_LABEL="yes (Recommender + Monitoring + Asset + BigQuery jobs viewer, read-only)"
 else
     BILLING_LABEL="no (re-run with --enable-billing to turn on)"
 fi
@@ -117,7 +117,9 @@ echo ""
 APIS=(compute.googleapis.com iamcredentials.googleapis.com)
 [[ "$DNS_ENABLED" -eq 1 ]] && APIS+=(dns.googleapis.com)
 if [[ "$BILLING_ENABLED" -eq 1 ]]; then
-    # Recommender, Monitoring, Asset Inventory, Cloud Billing, Resource Manager
+    # Recommender, Monitoring, Asset Inventory, Cloud Billing, Resource Manager,
+    # plus BigQuery (the connector needs to run SELECT jobs against the
+    # customer's billing-export table to power the cost dashboard).
     APIS+=(
         recommender.googleapis.com
         monitoring.googleapis.com
@@ -125,6 +127,8 @@ if [[ "$BILLING_ENABLED" -eq 1 ]]; then
         cloudbilling.googleapis.com
         cloudresourcemanager.googleapis.com
         serviceusage.googleapis.com
+        bigquery.googleapis.com
+        bigquerystorage.googleapis.com
     )
 fi
 echo "[1/5] Enabling APIs: ${APIS[*]}"
